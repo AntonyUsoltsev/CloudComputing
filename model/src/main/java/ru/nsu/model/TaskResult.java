@@ -20,10 +20,10 @@ public class TaskResult implements Serializable {
     private final boolean success;
     
     @JsonProperty("result")
-    private final byte[] result; // Сериализованный результат
+    private final byte[] result;
     
     @JsonProperty("errorMessage")
-    private final String errorMessage; // Сообщение об ошибке, если success = false
+    private final String errorMessage;
 
     public static TaskResult success(UUID taskId, byte[] result) {
         return new TaskResult(taskId, true, result, null);
