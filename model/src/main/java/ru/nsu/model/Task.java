@@ -1,6 +1,5 @@
 package ru.nsu.model;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -8,10 +7,6 @@ import lombok.Getter;
 import java.io.Serializable;
 import java.util.UUID;
 
-/**
- * Представляет задачу для выполнения на worker-узле.
- * Содержит байткод функции, сериализованные аргументы и метаданные.
- */
 @Getter
 @AllArgsConstructor
 public class Task implements Serializable {
@@ -25,13 +20,13 @@ public class Task implements Serializable {
     private final String methodName;
     
     @JsonProperty("classBytes")
-    private final byte[] classBytes; // Байткод класса
+    private final byte[] classBytes;
     
     @JsonProperty("arguments")
-    private final byte[] arguments; // Сериализованные аргументы
+    private final byte[] arguments;
     
     @JsonProperty("codeHash")
-    private final String codeHash; // Хэш байткода для кэширования
+    private final String codeHash;
     
     @JsonProperty("metadata")
     private final TaskMetadata metadata;

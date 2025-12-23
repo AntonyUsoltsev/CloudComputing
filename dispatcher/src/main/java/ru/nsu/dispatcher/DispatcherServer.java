@@ -4,13 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import lombok.extern.slf4j.Slf4j;
+import ru.nsu.common.JacksonConfig;
 import ru.nsu.model.Task;
 import ru.nsu.model.TaskResult;
 import ru.nsu.model.WorkerInfo;
 import ru.nsu.model.WorkerRegistrationRequest;
 import ru.nsu.model.WorkerStatus;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.time.Instant;
@@ -36,7 +39,7 @@ public class DispatcherServer {
 
     public DispatcherServer(int port) {
         this.port = port;
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = JacksonConfig.createObjectMapper();
         this.workers = new ConcurrentHashMap<>();
         this.pendingTasks = new ConcurrentHashMap<>();
     }
@@ -206,7 +209,13 @@ public class DispatcherServer {
         try {
             TaskResult result = objectMapper.readValue(exchange.getRequestBody(), TaskResult.class);
             if (result.isSuccess()) {
-                log.info("Task {} completed successfully", result.getTaskId());
+                Object deserializedResult;
+                try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(result.getResult()))) {
+                    deserializedResult = ois.readObject();
+                }
+
+                log.info("Task {} completed successfully. Result: {}",
+                        result.getTaskId(), deserializedResult);
             } else {
                 log.warn("Task {} failed: {}", result.getTaskId(), result.getErrorMessage());
             }
