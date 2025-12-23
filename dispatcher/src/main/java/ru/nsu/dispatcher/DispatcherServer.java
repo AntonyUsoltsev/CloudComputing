@@ -5,7 +5,11 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.common.JacksonConfig;
-import ru.nsu.model.*;
+import ru.nsu.model.Task;
+import ru.nsu.model.TaskResult;
+import ru.nsu.model.WorkerInfo;
+import ru.nsu.model.WorkerRegistrationRequest;
+import ru.nsu.model.WorkerStatus;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -18,7 +22,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
