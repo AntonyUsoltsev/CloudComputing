@@ -3,6 +3,7 @@ package ru.nsu;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.worker.WorkerServer;
 
+import java.io.IOException;
 import java.net.URI;
 
 @Slf4j
@@ -31,7 +32,7 @@ public class Main {
         }
 
         WorkerServer server = new WorkerServer(workerId, workerPort, URI.create(dispatcherUrl));
-        
+
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             log.info("Shutting down...");
             server.stop();
@@ -40,6 +41,8 @@ public class Main {
         try {
             server.start();
             Thread.currentThread().join();
+        } catch (IOException e) {
+            log.error("Failed to start worker server", e);
         } catch (InterruptedException e) {
             log.error("Worker interrupted", e);
         }

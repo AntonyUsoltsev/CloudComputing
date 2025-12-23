@@ -5,24 +5,20 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.common.JacksonConfig;
-import ru.nsu.model.Task;
-import ru.nsu.model.TaskResult;
-import ru.nsu.model.WorkerInfo;
-import ru.nsu.model.WorkerRegistrationRequest;
-import ru.nsu.model.WorkerStatus;
+import ru.nsu.model.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -34,14 +30,18 @@ public class DispatcherServer {
     private final int port;
     private final ObjectMapper objectMapper;
     private final Map<String, WorkerInfo> workers;
-    private final Map<UUID, Task> pendingTasks;
+    private final Map<UUID, String> taskToWorker; // Маппинг taskId -> workerId
+    private final HttpClient httpClient;
     private HttpServer httpServer;
 
     public DispatcherServer(int port) {
         this.port = port;
         this.objectMapper = JacksonConfig.createObjectMapper();
         this.workers = new ConcurrentHashMap<>();
-        this.pendingTasks = new ConcurrentHashMap<>();
+        this.taskToWorker = new ConcurrentHashMap<>();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
     }
 
     /**
@@ -49,22 +49,19 @@ public class DispatcherServer {
      */
     public void start() throws IOException {
         httpServer = HttpServer.create(new InetSocketAddress(port), 0);
-        
+
         // Регистрация worker-а
         httpServer.createContext("/api/workers/register", this::handleWorkerRegistration);
-        
+
         // Heartbeat от worker-а
         httpServer.createContext("/api/workers/heartbeat", this::handleHeartbeat);
-        
+
         // Получение списка worker-ов
         httpServer.createContext("/api/workers", this::handleGetWorkers);
-        
+
         // Отправка задачи на выполнение
         httpServer.createContext("/api/tasks/submit", this::handleTaskSubmit);
-        
-        // Получение задачи для выполнения (для worker-а)
-        httpServer.createContext("/api/tasks/get", this::handleGetTask);
-        
+
         // Отправка результата выполнения (от worker-а)
         httpServer.createContext("/api/tasks/result", this::handleTaskResult);
 
@@ -96,7 +93,6 @@ public class DispatcherServer {
             WorkerInfo workerInfo = new WorkerInfo(
                     request.getWorkerId(),
                     request.getAddress(),
-                    0,
                     WorkerStatus.ALIVE,
                     Instant.now()
             );
@@ -121,12 +117,10 @@ public class DispatcherServer {
             Map<String, String> request = objectMapper.readValue(
                     exchange.getRequestBody(), Map.class);
             String workerId = request.get("workerId");
-            int activeTasks = Integer.parseInt(request.getOrDefault("activeTasks", "0"));
 
             WorkerInfo worker = workers.get(workerId);
             if (worker != null) {
                 workers.put(workerId, worker
-                        .withActiveTasks(activeTasks)
                         .withLastHeartbeat(Instant.now())
                         .withStatus(WorkerStatus.ALIVE));
             }
@@ -157,7 +151,6 @@ public class DispatcherServer {
 
         try {
             Task task = objectMapper.readValue(exchange.getRequestBody(), Task.class);
-            pendingTasks.put(task.getTaskId(), task);
 
             // Выбираем worker для выполнения задачи
             WorkerInfo selectedWorker = selectWorker();
@@ -168,11 +161,20 @@ public class DispatcherServer {
 
             log.info("Task {} assigned to worker {}", task.getTaskId(), selectedWorker.getWorkerId());
 
-            // MVP
+            // Отправляем задачу worker-у напрямую
+            boolean sent = sendTaskToWorker(task, selectedWorker);
+            if (!sent) {
+                sendError(exchange, 500, "Failed to send task to worker");
+                return;
+            }
+
+            selectedWorker.addTask(task.getTaskId());
+            taskToWorker.put(task.getTaskId(), selectedWorker.getWorkerId());
+
             Map<String, String> response = new HashMap<>();
             response.put("taskId", task.getTaskId().toString());
             response.put("workerId", selectedWorker.getWorkerId());
-            response.put("workerAddress", selectedWorker.getAddress().toString());
+            response.put("status", "assigned");
 
             sendSuccessResponse(exchange, objectMapper.writeValueAsString(response));
         } catch (Exception e) {
@@ -181,23 +183,35 @@ public class DispatcherServer {
         }
     }
 
-    private void handleGetTask(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
-            sendError(exchange, 405, "Method not allowed");
-            return;
+    /**
+     * Отправляет задачу worker-у напрямую через HTTP POST.
+     */
+    private boolean sendTaskToWorker(Task task, WorkerInfo worker) {
+        try {
+            String taskJson = objectMapper.writeValueAsString(task);
+            URI workerTaskUrl = worker.getAddress().resolve("/api/tasks/execute");
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(workerTaskUrl)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(taskJson))
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                log.debug("Task {} sent to worker {} successfully", task.getTaskId(), worker.getWorkerId());
+                return true;
+            } else {
+                log.warn("Failed to send task {} to worker {}: status {}",
+                        task.getTaskId(), worker.getWorkerId(), response.statusCode());
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("Error sending task {} to worker {}", task.getTaskId(), worker.getWorkerId(), e);
+            return false;
         }
-
-        // В MVP возвращаем первую доступную задачу
-        if (pendingTasks.isEmpty()) {
-            sendSuccessResponse(exchange, "");
-            return;
-        }
-
-        Task task = pendingTasks.values().iterator().next();
-        pendingTasks.remove(task.getTaskId());
-
-        String response = objectMapper.writeValueAsString(task);
-        sendSuccessResponse(exchange, response);
     }
 
     private void handleTaskResult(HttpExchange exchange) throws IOException {
@@ -208,6 +222,15 @@ public class DispatcherServer {
 
         try {
             TaskResult result = objectMapper.readValue(exchange.getRequestBody(), TaskResult.class);
+
+            String workerId = taskToWorker.remove(result.getTaskId());
+            if (workerId != null) {
+                WorkerInfo worker = workers.get(workerId);
+                if (worker != null) {
+                    worker.removeTask(result.getTaskId());
+                }
+            }
+
             if (result.isSuccess()) {
                 Object deserializedResult;
                 try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(result.getResult()))) {
