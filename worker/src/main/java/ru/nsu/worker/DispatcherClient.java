@@ -3,7 +3,6 @@ package ru.nsu.worker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.common.JacksonConfig;
-import ru.nsu.model.Task;
 import ru.nsu.model.TaskResult;
 import ru.nsu.model.WorkerRegistrationRequest;
 
@@ -41,7 +40,7 @@ public class DispatcherClient {
                     .build();
 
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            
+
             if (response.statusCode() == 200) {
                 log.info("Successfully registered worker {} at {}", workerId, workerAddress);
                 return true;
@@ -73,31 +72,6 @@ public class DispatcherClient {
         } catch (Exception e) {
             log.error("Error sending heartbeat", e);
             return false;
-        }
-    }
-
-    public Task getTask() {
-        try {
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(dispatcherBaseUrl.resolve("/api/tasks/get"))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            
-            if (response.statusCode() == 200 && !response.body().isEmpty()) {
-                return objectMapper.readValue(response.body(), Task.class);
-            } else if (response.body().isEmpty()) {
-                // No tasks available
-                log.info("No tasks available while getting task");
-                return null;
-            } else {
-                log.warn("Unexpected response when getting task: {}", response.statusCode());
-                return null;
-            }
-        } catch (Exception e) {
-            log.error("Error getting task", e);
-            return null;
         }
     }
 
