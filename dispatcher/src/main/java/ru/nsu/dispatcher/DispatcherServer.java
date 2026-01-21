@@ -40,6 +40,7 @@ public class DispatcherServer {
     private final ObjectMapper objectMapper;
     private final Map<String, WorkerInfo> workers;
     private final Map<UUID, String> taskToWorker; // Маппинг taskId -> workerId
+    private final Map<UUID, TaskResult> taskResults;
     private final HttpClient httpClient;
     private HttpServer httpServer;
 
@@ -48,6 +49,7 @@ public class DispatcherServer {
         this.objectMapper = JacksonConfig.createObjectMapper();
         this.workers = new ConcurrentHashMap<>();
         this.taskToWorker = new ConcurrentHashMap<>();
+        this.taskResults = new ConcurrentHashMap<>();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
@@ -73,6 +75,9 @@ public class DispatcherServer {
 
         // Отправка результата выполнения (от worker-а)
         httpServer.createContext("/api/tasks/result", this::handleTaskResult);
+
+        // Получение результата задачи (от клиента)
+        httpServer.createContext("/api/tasks/", this::handleGetTaskResult);
 
         httpServer.setExecutor(null); // Используем дефолтный executor
         httpServer.start();
@@ -232,6 +237,9 @@ public class DispatcherServer {
         try {
             TaskResult result = objectMapper.readValue(exchange.getRequestBody(), TaskResult.class);
 
+            // Сохраняем результат для клиента
+            taskResults.put(result.getTaskId(), result);
+
             String workerId = taskToWorker.remove(result.getTaskId());
             if (workerId != null) {
                 WorkerInfo worker = workers.get(workerId);
@@ -255,6 +263,36 @@ public class DispatcherServer {
             sendSuccessResponse(exchange, "{\"status\":\"received\"}");
         } catch (Exception e) {
             log.error("Error processing task result", e);
+            sendError(exchange, 400, "Invalid request: " + e.getMessage());
+        }
+    }
+
+    private void handleGetTaskResult(HttpExchange exchange) throws IOException {
+        if (!"GET".equals(exchange.getRequestMethod())) {
+            sendError(exchange, 405, "Method not allowed");
+            return;
+        }
+
+        try {
+            String path = exchange.getRequestURI().getPath();
+            String[] parts = path.split("/");
+            if (parts.length < 4) {
+                sendError(exchange, 400, "Invalid task ID");
+                return;
+            }
+
+            UUID taskId = UUID.fromString(parts[3]);
+            TaskResult result = taskResults.get(taskId);
+
+            if (result == null) {
+                sendError(exchange, 404, "Task result not found");
+                return;
+            }
+
+            String response = objectMapper.writeValueAsString(result);
+            sendSuccessResponse(exchange, response);
+        } catch (Exception e) {
+            log.error("Error getting task result", e);
             sendError(exchange, 400, "Invalid request: " + e.getMessage());
         }
     }

@@ -51,13 +51,21 @@ public class WorkerServer {
         running = true;
         log.info("Starting worker server: {} on port {}", workerId, workerPort);
 
-        httpServer = HttpServer.create(new InetSocketAddress(workerPort), 0);
+        httpServer = HttpServer.create(new InetSocketAddress("0.0.0.0", workerPort), 0);
         httpServer.createContext("/api/tasks/execute", this::handleTaskExecution);
         httpServer.setExecutor(null);
         httpServer.start();
         log.info("Worker HTTP server started on port {}", workerPort);
 
-        URI workerAddress = URI.create("http://localhost:" + workerPort);
+        String workerHost = System.getenv("WORKER_HOST");
+        if (workerHost == null || workerHost.isEmpty()) {
+            workerHost = System.getenv("HOSTNAME");
+            if (workerHost == null || workerHost.isEmpty()) {
+                workerHost = "localhost";
+            }
+        }
+        URI workerAddress = URI.create("http://" + workerHost + ":" + workerPort);
+        log.info("Registering worker with address: {}", workerAddress);
         if (!dispatcherClient.registerWorker(workerId, workerAddress)) {
             log.error("Failed to register worker, stopping");
             stop();
@@ -66,8 +74,8 @@ public class WorkerServer {
 
         scheduler.scheduleAtFixedRate(
                 this::sendHeartbeat,
-                5, // Начальная задержка 5 секунд
-                10, // Период 10 секунд
+                5,
+                10,
                 TimeUnit.SECONDS
         );
 

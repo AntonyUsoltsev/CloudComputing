@@ -1,0 +1,33 @@
+services:
+  dispatcher:
+    build:
+      context: .
+      dockerfile: ./dispatcher/Dockerfile
+    container_name: cloud-dispatcher
+    ports:
+      - "8080:8080"
+    command: [ "java", "-jar", "app.jar" ]
+    networks:
+      - cloud-network
+
+  worker1:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    container_name: cloud-worker-1
+    hostname: worker1
+    ports:
+      - "8081:8081"
+    environment:
+      - WORKER_HOST=worker1
+    command: [ "java", "-jar", "app.jar", "8081", "http://dispatcher:8080", "worker-1" ]
+    depends_on:
+      - dispatcher
+    networks:
+      - cloud-network
+
+
+networks:
+  cloud-network:
+    driver: bridge
+

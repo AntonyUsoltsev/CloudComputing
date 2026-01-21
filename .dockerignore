@@ -1,0 +1,11 @@
+target/
+.idea/
+*.iml
+.git/
+.gitignore
+examples/
+docs/
+*.md
+!README.md
+client-api/src/
+
