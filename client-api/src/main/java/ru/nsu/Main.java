@@ -1,17 +1,78 @@
 package ru.nsu;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-public class Main {
-    public static void main(String[] args) {
-        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-        // to see how IntelliJ IDEA suggests fixing it.
-        System.out.printf("Hello and welcome!");
+import lombok.extern.slf4j.Slf4j;
+import ru.nsu.client.Cloud;
+import ru.nsu.client.CloudClient;
+import ru.nsu.client.RemoteFunction;
 
-        for (int i = 1; i <= 5; i++) {
-            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-            System.out.println("i = " + i);
-        }
+import java.util.concurrent.CompletableFuture;
+
+@Slf4j
+public class Main {
+    public static void main(String[] args) throws Exception {
+        CloudClient client = Cloud.createClient("http://localhost:8080");
+        sum_sync(client);
+        multiply_sync(client);
+        sym_async(client);
+    }
+
+    private static void sum_sync(CloudClient client) throws Exception {
+        log.info("sum_sync");
+
+        RemoteFunction<Integer> sum = Cloud.remoteFunction(
+                client,
+                SimpleCalculator.class,
+                "sum",
+                Integer.class,
+                Integer.class
+        );
+        Integer result = sum.call(32, 44);
+        log.info("Result: 32 + 44 = {}", result);
+    }
+
+    private static void multiply_sync(CloudClient client) throws Exception {
+        log.info("multiply_sync");
+
+        RemoteFunction<Integer> multiply = Cloud.remoteFunction(
+                client,
+                SimpleCalculator.class,
+                "multiply",
+                Integer.class,
+                Integer.class
+        );
+        Integer result = multiply.call(32, 44);
+        log.info("Result: 32 * 44 = {}", result);
+    }
+
+    private static void sym_async(CloudClient client) throws Exception {
+        log.info("sym_async");
+
+        RemoteFunction<Integer> sum = Cloud.remoteFunction(
+                client,
+                SimpleCalculator.class,
+                "sum",
+                Integer.class,
+                Integer.class
+        );
+
+        CompletableFuture<Integer> task1 = sum.callAsync(10, 20);
+        CompletableFuture<Integer> task2 = sum.callAsync(30, 40);
+        CompletableFuture<Integer> task3 = sum.callAsync(50, 60);
+
+        Integer result1 = task1.get();
+        Integer result2 = task2.get();
+        Integer result3 = task3.get();
+
+        log.info("Results: {}, {}, {}", result1, result2, result3);
+    }
+}
+
+class SimpleCalculator {
+    public static int sum(Integer a, Integer b) {
+        return a + b;
+    }
+
+    public static int multiply(Integer a, Integer b) {
+        return a * b;
     }
 }

@@ -76,6 +76,7 @@ public class TaskExecutor {
 
             Object result;
             try {
+                method.setAccessible(true);
                 result = method.invoke(null, args);
                 log.debug("Method {} executed successfully, result type: {}, result value : {}", task.getMethodName(),
                         result != null ? result.getClass().getName() : "null", result);
