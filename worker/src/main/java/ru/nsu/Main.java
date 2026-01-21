@@ -13,6 +13,8 @@ public class Main {
     private static final String DEFAULT_WORKER_ID = "worker-" + System.currentTimeMillis();
 
     public static void main(String[] args) {
+        log.debug("Received {} arguments: {}", args.length, java.util.Arrays.toString(args));
+        
         int workerPort = DEFAULT_WORKER_PORT;
         String dispatcherUrl = DEFAULT_DISPATCHER_URL;
         String workerId = DEFAULT_WORKER_ID;
@@ -21,7 +23,7 @@ public class Main {
             try {
                 workerPort = Integer.parseInt(args[0]);
             } catch (NumberFormatException e) {
-                log.error("Invalid worker port number, using default: {}", DEFAULT_WORKER_PORT);
+                log.error("Invalid worker port number '{}', using default: {}", args[0], DEFAULT_WORKER_PORT);
             }
         }
         if (args.length > 1) {
@@ -30,6 +32,8 @@ public class Main {
         if (args.length > 2) {
             workerId = args[2];
         }
+        
+        log.info("Starting worker with port={}, dispatcherUrl={}, workerId={}", workerPort, dispatcherUrl, workerId);
 
         WorkerServer server = new WorkerServer(workerId, workerPort, URI.create(dispatcherUrl));
 
