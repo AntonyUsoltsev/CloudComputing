@@ -7,6 +7,10 @@ import lombok.Getter;
 import java.io.Serializable;
 import java.util.UUID;
 
+/**
+ * Задача для выполнения на удаленном узле
+ * Содержит байткод класса, аргументы метода и метаданные
+ */
 @Getter
 @AllArgsConstructor
 public class Task implements Serializable {

@@ -2,6 +2,9 @@ package ru.nsu.client;
 
 import java.net.URI;
 
+/**
+ * Точка входа для создания клиентов и удаленных функций
+ */
 public class Cloud {
 
     public static CloudClient createClient(String dispatcherUrl) {

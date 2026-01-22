@@ -15,6 +15,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * HTTP клиент для связи worker с dispatcher
+ */
 @Slf4j
 public class DispatcherClient {
     private final URI dispatcherBaseUrl;

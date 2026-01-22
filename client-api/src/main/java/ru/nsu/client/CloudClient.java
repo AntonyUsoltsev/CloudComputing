@@ -20,7 +20,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Клиент для взаимодействия с Dispatcher.
+ * Клиент для взаимодействия с Dispatcher
+ * Обеспечивает отправку задач, получение результатов и управление выполнением
  */
 @Slf4j
 public class CloudClient {

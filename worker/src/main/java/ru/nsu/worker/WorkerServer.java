@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Основной сервер worker-узла.
- * Управляет регистрацией, heartbeat, получением и выполнением задач.
+ * Управляет регистрацией в dispatcher, отправкой heartbeat,
+ * получением задач от dispatcher и их выполнением.
  */
 @Slf4j
 public class WorkerServer {

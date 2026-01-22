@@ -16,8 +16,9 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
- * Выполняет задачи в пуле потоков.
- * Использует DynamicClassLoader для загрузки и выполнения кода.
+ * Выполняет задачи в пуле потоков
+ * Использует DynamicClassLoader для динамической загрузки кода
+ * Отслеживает загруженные классы по codeHash для оптимизации
  */
 @Slf4j
 public class TaskExecutor {

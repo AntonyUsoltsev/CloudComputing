@@ -8,6 +8,12 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Обертка для удаленного вызова функци
+ * Позволяет вызывать методы на удаленных узлах как локальные функции
+ *
+ * @param <R> тип возвращаемого значения
+ */
 @Slf4j
 @AllArgsConstructor
 public class RemoteFunction<R> {
