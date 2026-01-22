@@ -97,7 +97,7 @@ public class DistributedMap {
     private <T> Task createMapTask(List<T> chunk) throws IOException {
         byte[] arguments = CloudClient.serializeArguments(chunk);
 
-        String codeHash = calculateHash(mapperClassBytes);
+        String codeHash = HashUtils.calculateHash(mapperClassBytes);
 
         TaskMetadata metadata = new TaskMetadata(Instant.now(), 1, 60000);
 
@@ -119,10 +119,6 @@ public class DistributedMap {
             partitions.add(new ArrayList<>(list.subList(i, end)));
         }
         return partitions;
-    }
-
-    private String calculateHash(byte[] data) {
-        return HashUtils.calculateHash(data);
     }
 }
 
