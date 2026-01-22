@@ -15,5 +15,14 @@ public class Cloud {
             Class<?>... parameterTypes) throws Exception {
         return RemoteFunction.of(client, clazz, methodName, parameterTypes);
     }
+
+    public static DistributedMap distributedMap(
+            CloudClient client,
+            Class<?> mapperClass,
+            String mapperMethodName) throws Exception {
+        byte[] classBytes = RemoteFunction.loadClassBytes(mapperClass);
+        String className = mapperClass.getName();
+        return new DistributedMap(client, className, mapperMethodName, classBytes, 10);
+    }
 }
 

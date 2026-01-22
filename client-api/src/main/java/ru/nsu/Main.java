@@ -3,9 +3,13 @@ package ru.nsu;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.client.Cloud;
 import ru.nsu.client.CloudClient;
+import ru.nsu.client.DistributedMap;
 import ru.nsu.client.RemoteFunction;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class Main {
@@ -14,6 +18,7 @@ public class Main {
         sum_sync(client);
         multiply_sync(client);
         sym_async(client);
+        distributedMapExample(client);
     }
 
     private static void sum_sync(CloudClient client) throws Exception {
@@ -65,6 +70,21 @@ public class Main {
 
         log.info("Results: {}, {}, {}", result1, result2, result3);
     }
+
+    private static void distributedMapExample(CloudClient client) throws Exception {
+        log.info("distributedMapExample");
+
+        List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20);
+
+        DistributedMap map = Cloud.distributedMap(
+                client,
+                SimpleCalculator.class,
+                "square"
+        );
+
+        List<Integer> squared = map.map(numbers, Integer.class);
+        log.info("Squared numbers: {}", squared);
+    }
 }
 
 class SimpleCalculator {
@@ -74,5 +94,11 @@ class SimpleCalculator {
 
     public static int multiply(Integer a, Integer b) {
         return a * b;
+    }
+
+    public static List<Integer> square(List<Integer> numbers) {
+        return numbers.stream()
+                .map(n -> n * n)
+                .collect(Collectors.toList());
     }
 }
