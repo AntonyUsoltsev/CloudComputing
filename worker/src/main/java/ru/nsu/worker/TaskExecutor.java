@@ -131,11 +131,26 @@ public class TaskExecutor {
     }
 
     private Method findMethod(Class<?> clazz, String methodName, Object[] args) throws NoSuchMethodException {
-        Class<?>[] paramTypes = new Class[args.length];
-        for (int i = 0; i < args.length; i++) {
-            paramTypes[i] = args[i].getClass();
+        for (Method method : clazz.getMethods()) {
+            if (!method.getName().equals(methodName)) {
+                continue;
+            }
+            if (method.getParameterCount() != args.length) {
+                continue;
+            }
+            Class<?>[] paramTypes = method.getParameterTypes();
+            boolean matches = true;
+            for (int i = 0; i < args.length; i++) {
+                if (!paramTypes[i].isAssignableFrom(args[i].getClass())) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                return method;
+            }
         }
-        return clazz.getMethod(methodName, paramTypes);
+        throw new NoSuchMethodException("Method " + methodName + " with compatible arguments not found");
     }
 
     @FunctionalInterface
