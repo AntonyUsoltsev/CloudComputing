@@ -19,6 +19,11 @@ public class Main {
         multiply_sync(client);
         sym_async(client);
         distributedMapExample(client);
+
+        sum_sync(client);
+        sum_sync(client);
+        sum_sync(client);
+        sum_sync(client);
     }
 
     private static void sum_sync(CloudClient client) throws Exception {

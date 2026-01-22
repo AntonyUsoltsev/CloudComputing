@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 public class DispatcherClient {
@@ -54,11 +55,12 @@ public class DispatcherClient {
         }
     }
 
-    public boolean sendHeartbeat(String workerId, int activeTasks) {
+    public boolean sendHeartbeat(String workerId, int activeTasks, Set<String> codeHashes) {
         try {
-            Map<String, String> request = new HashMap<>();
+            Map<String, Object> request = new HashMap<>();
             request.put("workerId", workerId);
-            request.put("activeTasks", String.valueOf(activeTasks));
+            request.put("activeTasks", activeTasks);
+            request.put("codeHashes", codeHashes);
             String requestBody = objectMapper.writeValueAsString(request);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
