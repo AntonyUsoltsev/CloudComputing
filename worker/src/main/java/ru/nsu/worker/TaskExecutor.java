@@ -35,6 +35,7 @@ public class TaskExecutor {
 
     /**
      * Выполняет задачу
+     *
      * @param task задача для выполнения
      * @return TaskResult результат выполнения
      */
@@ -42,8 +43,8 @@ public class TaskExecutor {
         activeTasks++;
         try {
             log.info("Executing task {}", task.getTaskId());
-            log.debug("Task details: className={}, methodName={}, classBytes.length={}, arguments.length={}", 
-                    task.getClassName(), task.getMethodName(), 
+            log.debug("Task details: className={}, methodName={}, classBytes.length={}, arguments.length={}",
+                    task.getClassName(), task.getMethodName(),
                     task.getClassBytes() != null ? task.getClassBytes().length : 0,
                     task.getArguments() != null ? task.getArguments().length : 0);
 
@@ -134,8 +135,8 @@ public class TaskExecutor {
     }
 
     private byte[] serializeResult(Object result) throws Exception {
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        try (java.io.ObjectOutputStream oos = new java.io.ObjectOutputStream(baos)) {
+        var baos = new java.io.ByteArrayOutputStream();
+        try (var oos = new java.io.ObjectOutputStream(baos)) {
             oos.writeObject(result);
         }
         return baos.toByteArray();
