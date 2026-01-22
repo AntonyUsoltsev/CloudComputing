@@ -31,15 +31,16 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Центральный REST сервис для управления распределённым выполнением задач.
- * Обеспечивает регистрацию worker-ов, приём задач и балансировку нагрузки.
+ * Центральный REST сервис для управления распределенным выполнением задач.
+ * Обеспечивает регистрацию worker-ов, прием задач, балансировку нагрузки
+ * и выбор worker-ов с учетом наличия загруженного кода.
  */
 @Slf4j
 public class DispatcherServer {
     private final int port;
     private final ObjectMapper objectMapper;
     private final Map<String, WorkerInfo> workers;
-    private final Map<UUID, String> taskToWorker; // Маппинг taskId -> workerId
+    private final Map<UUID, String> taskToWorker;
     private final Map<UUID, TaskResult> taskResults;
     private final HttpClient httpClient;
     private HttpServer httpServer;
@@ -79,14 +80,12 @@ public class DispatcherServer {
         // Получение результата задачи (от клиента)
         httpServer.createContext("/api/tasks/", this::handleGetTaskResult);
 
-        httpServer.setExecutor(null); // Используем дефолтный executor
+        httpServer.setExecutor(null);
         httpServer.start();
         log.info("Dispatcher server started on port {}", port);
     }
 
-    /**
-     * Останавливает сервер.
-     */
+
     public void stop() {
         if (httpServer != null) {
             httpServer.stop(0);

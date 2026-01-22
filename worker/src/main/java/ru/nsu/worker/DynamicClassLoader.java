@@ -5,6 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Класс-загрузчик для динамической загрузки классов из байткода.
+ * Кэширует загруженные классы по codeHash для оптимизации.
+ */
 @Slf4j
 public class DynamicClassLoader extends ClassLoader {
     private final Map<String, Class<?>> classCache = new HashMap<>();
