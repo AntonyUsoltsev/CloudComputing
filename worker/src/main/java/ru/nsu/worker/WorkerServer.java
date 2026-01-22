@@ -105,7 +105,8 @@ public class WorkerServer {
         }
 
         int activeTasks = taskExecutor.getActiveTasks();
-        if (!dispatcherClient.sendHeartbeat(workerId, activeTasks)) {
+        var loadedCodeHashes = taskExecutor.getLoadedCodeHashes();
+        if (!dispatcherClient.sendHeartbeat(workerId, activeTasks, loadedCodeHashes)) {
             log.warn("Failed to send heartbeat");
         }
     }

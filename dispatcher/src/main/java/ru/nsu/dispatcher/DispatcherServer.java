@@ -128,12 +128,17 @@ public class DispatcherServer {
         }
 
         try {
-            Map<String, String> request = objectMapper.readValue(
-                    exchange.getRequestBody(), Map.class);
-            String workerId = request.get("workerId");
+            Map<String, Object> request = objectMapper.readValue(exchange.getRequestBody(), Map.class);
+            String workerId = (String) request.get("workerId");
 
             WorkerInfo worker = workers.get(workerId);
             if (worker != null) {
+                List<String> codeHashes = (List<String>) request.get("codeHashes");
+                if (codeHashes != null) {
+                    for (String codeHash : codeHashes) {
+                        worker.addCodeHash(codeHash);
+                    }
+                }
                 workers.put(workerId, worker
                         .withLastHeartbeat(Instant.now())
                         .withStatus(WorkerStatus.ALIVE));
@@ -167,7 +172,7 @@ public class DispatcherServer {
             Task task = objectMapper.readValue(exchange.getRequestBody(), Task.class);
 
             // Выбираем worker для выполнения задачи
-            WorkerInfo selectedWorker = selectWorker();
+            WorkerInfo selectedWorker = selectWorker(task.getCodeHash());
             if (selectedWorker == null) {
                 sendError(exchange, 503, "No available workers");
                 return;
@@ -175,7 +180,6 @@ public class DispatcherServer {
 
             log.info("Task {} assigned to worker {}", task.getTaskId(), selectedWorker.getWorkerId());
 
-            // Отправляем задачу worker-у напрямую
             boolean sent = sendTaskToWorker(task, selectedWorker);
             if (!sent) {
                 sendError(exchange, 500, "Failed to send task to worker");
@@ -298,9 +302,30 @@ public class DispatcherServer {
     }
 
     /**
-     * Выбирает worker для выполнения задачи по принципу минимальной загрузки.
+     * Выбирает worker для выполнения задачи.
+     * Приоритет: сначала worker с нужным codeHash, затем по минимальной загрузке.
      */
-    private WorkerInfo selectWorker() {
+    private WorkerInfo selectWorker(String codeHash) {
+        if (codeHash == null || codeHash.isEmpty()) {
+            return selectWorkerByLoad();
+        }
+
+        WorkerInfo workerWithCode = workers.values().stream()
+                .filter(w -> w.getStatus() == WorkerStatus.ALIVE)
+                .filter(w -> w.hasCodeHash(codeHash))
+                .min(Comparator.comparingInt(WorkerInfo::getActiveTasks))
+                .orElse(null);
+
+        if (workerWithCode != null) {
+            log.debug("Selected worker {} with cached code (hash: {})", workerWithCode.getWorkerId(), codeHash);
+            return workerWithCode;
+        }
+
+        log.debug("No worker with cached code (hash: {}), selecting by load", codeHash);
+        return selectWorkerByLoad();
+    }
+
+    private WorkerInfo selectWorkerByLoad() {
         return workers.values().stream()
                 .filter(w -> w.getStatus() == WorkerStatus.ALIVE)
                 .min(Comparator.comparingInt(WorkerInfo::getActiveTasks))

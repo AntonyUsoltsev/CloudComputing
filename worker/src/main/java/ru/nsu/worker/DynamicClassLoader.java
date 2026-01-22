@@ -15,20 +15,24 @@ public class DynamicClassLoader extends ClassLoader {
 
     /**
      * Загружает класс из байткода.
+     * Если класс с таким codeHash уже загружен, возвращает его из кэша.
      * @param className имя класса
      * @param classBytes байткод класса
+     * @param codeHash хеш байткода для проверки кэша
      * @return загруженный класс
      * @throws ClassFormatError если байткод невалидный
      */
-    public Class<?> loadClassFromBytes(String className, byte[] classBytes) throws ClassFormatError {
-        if (classCache.containsKey(className)) {
-            log.debug("Class {} found in cache", className);
-            return classCache.get(className);
+    public Class<?> loadClassFromBytes(String className, byte[] classBytes, String codeHash) throws ClassFormatError {
+        String cacheKey = codeHash != null ? codeHash : className;
+
+        if (isClassCached(cacheKey)) {
+            log.debug("Class {} with hash {} found in cache", className, codeHash);
+            return classCache.get(cacheKey);
         }
 
-        log.debug("Loading class {} from {} bytes", className, classBytes.length);
+        log.debug("Loading class {} from {} bytes (hash: {})", className, classBytes.length, codeHash);
         
-        // Проверяем минимальный размер класса (магическое число CAFEBABE + версия + минимум данных)
+        // Проверяем минимальный размер класса (CAFEBABE + версия + минимум данных)
         if (classBytes.length < 8) {
             throw new ClassFormatError("Class file too small: " + classBytes.length + " bytes. Minimum is 8 bytes.");
         }
@@ -39,14 +43,14 @@ public class DynamicClassLoader extends ClassLoader {
         }
 
         Class<?> clazz = defineClass(className, classBytes, 0, classBytes.length);
-        classCache.put(className, clazz);
-        log.debug("Class {} loaded and cached successfully", className);
+        classCache.put(cacheKey, clazz);
+        log.debug("Class {} loaded and cached successfully (hash: {})", className, codeHash);
         
         return clazz;
     }
 
-    public boolean isClassCached(String className) {
-        return classCache.containsKey(className);
+    public boolean isClassCached(String cacheKey) {
+        return cacheKey != null && classCache.containsKey(cacheKey);
     }
 }
 

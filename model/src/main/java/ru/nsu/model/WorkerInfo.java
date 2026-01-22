@@ -27,6 +27,9 @@ public class WorkerInfo implements Serializable {
     @JsonIgnore
     private final Set<UUID> activeTaskIds;
 
+    @JsonIgnore
+    private final Set<String> cachedCodeHashes;
+
     @JsonProperty("status")
     private final WorkerStatus status;
 
@@ -37,6 +40,7 @@ public class WorkerInfo implements Serializable {
         this.workerId = workerId;
         this.address = address;
         this.activeTaskIds = ConcurrentHashMap.newKeySet();
+        this.cachedCodeHashes = ConcurrentHashMap.newKeySet();
         this.status = status;
         this.lastHeartbeat = lastHeartbeat;
     }
@@ -50,23 +54,25 @@ public class WorkerInfo implements Serializable {
     }
 
     public WorkerInfo withStatus(WorkerStatus status) {
-        return new WorkerInfo(workerId, address, activeTaskIds, status, lastHeartbeat);
+        return new WorkerInfo(workerId, address, activeTaskIds, cachedCodeHashes, status, lastHeartbeat);
     }
 
     public WorkerInfo withLastHeartbeat(Instant lastHeartbeat) {
-        return new WorkerInfo(workerId, address, activeTaskIds, status, lastHeartbeat);
+        return new WorkerInfo(workerId, address, activeTaskIds, cachedCodeHashes, status, lastHeartbeat);
     }
 
-    /**
-     * Добавляет задачу в Set активных задач.
-     */
+    public void addCodeHash(String codeHash) {
+        cachedCodeHashes.add(codeHash);
+    }
+
+    public boolean hasCodeHash(String codeHash) {
+        return cachedCodeHashes.contains(codeHash);
+    }
+
     public void addTask(UUID taskId) {
         activeTaskIds.add(taskId);
     }
 
-    /**
-     * Удаляет задачу из Set активных задач.
-     */
     public void removeTask(UUID taskId) {
         activeTaskIds.remove(taskId);
     }

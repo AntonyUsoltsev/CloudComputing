@@ -9,6 +9,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ObjectInputStream;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -21,16 +23,18 @@ import java.util.stream.Collectors;
 public class TaskExecutor {
     private final DynamicClassLoader classLoader;
     private final ExecutorService executorService;
+    private final Set<String> loadedCodeHashes;
     @Getter
     private volatile int activeTasks = 0;
 
     public TaskExecutor(DynamicClassLoader classLoader, int threadPoolSize) {
         this.classLoader = classLoader;
         this.executorService = Executors.newFixedThreadPool(threadPoolSize);
+        this.loadedCodeHashes = ConcurrentHashMap.newKeySet();
     }
 
     /**
-     * Выполняет задачу асинхронно.
+     * Выполняет задачу
      * @param task задача для выполнения
      * @return TaskResult результат выполнения
      */
@@ -45,8 +49,11 @@ public class TaskExecutor {
 
             Class<?> clazz;
             try {
-                clazz = classLoader.loadClassFromBytes(task.getClassName(), task.getClassBytes());
-                log.debug("Class {} loaded successfully", task.getClassName());
+                clazz = classLoader.loadClassFromBytes(task.getClassName(), task.getClassBytes(), task.getCodeHash());
+                if (task.getCodeHash() != null) {
+                    loadedCodeHashes.add(task.getCodeHash());
+                }
+                log.debug("Class {} loaded successfully (hash: {})", task.getClassName(), task.getCodeHash());
             } catch (LinkageError e) {
                 log.error("Failed to load class {}: {}", task.getClassName(), e.getMessage(), e);
                 return TaskResult.failure(task.getTaskId(), "Failed to load class: " + e.getMessage());
@@ -114,6 +121,10 @@ public class TaskExecutor {
 
     public void shutdown() {
         executorService.shutdown();
+    }
+
+    public Set<String> getLoadedCodeHashes() {
+        return Set.copyOf(loadedCodeHashes);
     }
 
     private Object[] deserializeArguments(byte[] arguments) throws Exception {
