@@ -76,7 +76,7 @@ public class WorkerServer {
         scheduler.scheduleAtFixedRate(
                 this::sendHeartbeat,
                 5,
-                10,
+                5,
                 TimeUnit.SECONDS
         );
 
@@ -126,6 +126,10 @@ public class WorkerServer {
             taskExecutor.executeTaskAsync(task, result -> {
                 if (!dispatcherClient.sendTaskResult(result)) {
                     log.error("Failed to send task result for task {}", task.getTaskId());
+                }
+            }, progress -> {
+                if (!dispatcherClient.sendTaskProgress(progress)) {
+                    log.warn("Failed to send task progress for task {}", task.getTaskId());
                 }
             });
         } catch (Exception e) {

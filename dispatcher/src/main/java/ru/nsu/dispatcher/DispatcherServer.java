@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.common.JacksonConfig;
 import ru.nsu.model.Task;
+import ru.nsu.model.TaskProgress;
 import ru.nsu.model.TaskResult;
 import ru.nsu.model.WorkerInfo;
 import ru.nsu.model.WorkerRegistrationRequest;
@@ -42,6 +43,7 @@ public class DispatcherServer {
     private final Map<String, WorkerInfo> workers;
     private final Map<UUID, String> taskToWorker;
     private final Map<UUID, TaskResult> taskResults;
+    private final Map<UUID, TaskProgress> taskProgress;
     private final HttpClient httpClient;
     private HttpServer httpServer;
 
@@ -51,6 +53,7 @@ public class DispatcherServer {
         this.workers = new ConcurrentHashMap<>();
         this.taskToWorker = new ConcurrentHashMap<>();
         this.taskResults = new ConcurrentHashMap<>();
+        this.taskProgress = new ConcurrentHashMap<>();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
@@ -76,6 +79,9 @@ public class DispatcherServer {
 
         // Отправка результата выполнения (от worker-а)
         httpServer.createContext("/api/tasks/result", this::handleTaskResult);
+
+        // Отправка прогресса выполнения (от worker-а)
+        httpServer.createContext("/api/tasks/progress", this::handleTaskProgress);
 
         // Получение результата задачи (от клиента)
         httpServer.createContext("/api/tasks/", this::handleGetTaskResult);
@@ -187,6 +193,7 @@ public class DispatcherServer {
 
             selectedWorker.addTask(task.getTaskId());
             taskToWorker.put(task.getTaskId(), selectedWorker.getWorkerId());
+            taskProgress.put(task.getTaskId(), TaskProgress.pending(task.getTaskId()));
 
             Map<String, String> response = new HashMap<>();
             response.put("taskId", task.getTaskId().toString());
@@ -231,6 +238,22 @@ public class DispatcherServer {
         }
     }
 
+    private void handleTaskProgress(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            sendError(exchange, 405, "Method not allowed");
+            return;
+        }
+
+        try {
+            TaskProgress progress = objectMapper.readValue(exchange.getRequestBody(), TaskProgress.class);
+            taskProgress.put(progress.getTaskId(), progress);
+            sendSuccessResponse(exchange, "{\"status\":\"received\"}");
+        } catch (Exception e) {
+            log.error("Error processing task progress", e);
+            sendError(exchange, 400, "Invalid request: " + e.getMessage());
+        }
+    }
+
     private void handleTaskResult(HttpExchange exchange) throws IOException {
         if (!"POST".equals(exchange.getRequestMethod())) {
             sendError(exchange, 405, "Method not allowed");
@@ -242,6 +265,13 @@ public class DispatcherServer {
 
             // Сохраняем результат для клиента
             taskResults.put(result.getTaskId(), result);
+            
+            // Обновляем прогресс
+            if (result.isSuccess()) {
+                taskProgress.put(result.getTaskId(), TaskProgress.completed(result.getTaskId()));
+            } else {
+                taskProgress.put(result.getTaskId(), TaskProgress.failed(result.getTaskId(), result.getErrorMessage()));
+            }
 
             String workerId = taskToWorker.remove(result.getTaskId());
             if (workerId != null) {
@@ -285,8 +315,20 @@ public class DispatcherServer {
             }
 
             UUID taskId = UUID.fromString(parts[3]);
-            TaskResult result = taskResults.get(taskId);
+            
+            String query = exchange.getRequestURI().getQuery();
+            if (query != null && query.contains("progress")) {
+                TaskProgress progress = taskProgress.get(taskId);
+                if (progress == null) {
+                    sendError(exchange, 404, "Task progress not found");
+                    return;
+                }
+                String response = objectMapper.writeValueAsString(progress);
+                sendSuccessResponse(exchange, response);
+                return;
+            }
 
+            TaskResult result = taskResults.get(taskId);
             if (result == null) {
                 sendError(exchange, 404, "Task result not found");
                 return;

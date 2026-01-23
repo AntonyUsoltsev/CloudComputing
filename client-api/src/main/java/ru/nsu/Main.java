@@ -15,15 +15,23 @@ import java.util.stream.Collectors;
 public class Main {
     public static void main(String[] args) throws Exception {
         CloudClient client = Cloud.createClient("http://localhost:8080");
+
         sum_sync(client);
+//        Thread.sleep(6000);
         multiply_sync(client);
+//        Thread.sleep(6000);
         sym_async(client);
+//        Thread.sleep(6000);
         distributedMapExample(client);
 
         sum_sync(client);
         sum_sync(client);
         sum_sync(client);
         sum_sync(client);
+
+//        Thread.sleep(2000);
+        longRunningTaskWithProgress(client);
+
     }
 
     private static void sum_sync(CloudClient client) throws Exception {
@@ -90,6 +98,20 @@ public class Main {
         List<Integer> squared = map.map(numbers, Integer.class);
         log.info("Squared numbers: {}", squared);
     }
+
+    private static void longRunningTaskWithProgress(CloudClient client) throws Exception {
+        log.info("longRunningTaskWithProgress");
+
+        RemoteFunction<Long> factorial = Cloud.remoteFunction(
+                client,
+                LongRunningTask.class,
+                "factorial",
+                Integer.class
+        );
+
+        Long result = factorial.call(20);
+        log.info("Result: factorial(20) = {}", result);
+    }
 }
 
 class SimpleCalculator {
@@ -105,5 +127,26 @@ class SimpleCalculator {
         return numbers.stream()
                 .map(n -> n * n)
                 .collect(Collectors.toList());
+    }
+}
+
+class LongRunningTask {
+    public static long factorial(Integer n) {
+        if (n <= 1) {
+            return 1;
+        }
+        
+        long result = 1;
+        for (int i = 2; i <= n; i++) {
+            result *= i;
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        
+        return result;
     }
 }
