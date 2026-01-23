@@ -3,6 +3,7 @@ package ru.nsu.worker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.common.JacksonConfig;
+import ru.nsu.model.TaskProgress;
 import ru.nsu.model.TaskResult;
 import ru.nsu.model.WorkerRegistrationRequest;
 
@@ -76,6 +77,24 @@ public class DispatcherClient {
             return response.statusCode() == 200;
         } catch (Exception e) {
             log.error("Error sending heartbeat", e);
+            return false;
+        }
+    }
+
+    public boolean sendTaskProgress(TaskProgress progress) {
+        try {
+            String requestBody = objectMapper.writeValueAsString(progress);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(dispatcherBaseUrl.resolve("/api/tasks/progress"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() == 200;
+        } catch (Exception e) {
+            log.error("Error sending task progress", e);
             return false;
         }
     }

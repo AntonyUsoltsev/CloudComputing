@@ -3,7 +3,9 @@ package ru.nsu.worker;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.model.Task;
+import ru.nsu.model.TaskProgress;
 import ru.nsu.model.TaskResult;
+import ru.nsu.model.TaskStatus;
 
 import java.io.ByteArrayInputStream;
 import java.io.ObjectInputStream;
@@ -41,13 +43,28 @@ public class TaskExecutor {
      * @return TaskResult результат выполнения
      */
     public TaskResult executeTask(Task task) {
+        return executeTask(task, null);
+    }
+
+    public void executeTaskAsync(Task task, TaskResultCallback callback, ProgressCallback progressCallback) {
+        executorService.submit(() -> {
+            TaskResult result = executeTask(task, progressCallback);
+            callback.onComplete(result);
+        });
+    }
+
+    public void executeTaskAsync(Task task, TaskResultCallback callback) {
+        executeTaskAsync(task, callback, null);
+    }
+
+    private TaskResult executeTask(Task task, ProgressCallback progressCallback) {
+        if (progressCallback != null) {
+            progressCallback.onProgress(TaskProgress.running(task.getTaskId(), 10, "Loading class"));
+        }
+
         activeTasks++;
         try {
             log.info("Executing task {}", task.getTaskId());
-            log.debug("Task details: className={}, methodName={}, classBytes.length={}, arguments.length={}",
-                    task.getClassName(), task.getMethodName(),
-                    task.getClassBytes() != null ? task.getClassBytes().length : 0,
-                    task.getArguments() != null ? task.getArguments().length : 0);
 
             Class<?> clazz;
             try {
@@ -59,6 +76,10 @@ public class TaskExecutor {
             } catch (LinkageError e) {
                 log.error("Failed to load class {}: {}", task.getClassName(), e.getMessage(), e);
                 return TaskResult.failure(task.getTaskId(), "Failed to load class: " + e.getMessage());
+            }
+
+            if (progressCallback != null) {
+                progressCallback.onProgress(TaskProgress.running(task.getTaskId(), 30, "Deserializing arguments"));
             }
 
             Object[] args;
@@ -74,6 +95,10 @@ public class TaskExecutor {
                 return TaskResult.failure(task.getTaskId(), "Failed to deserialize arguments: " + e.getMessage());
             }
 
+            if (progressCallback != null) {
+                progressCallback.onProgress(TaskProgress.running(task.getTaskId(), 50, "Finding method"));
+            }
+
             Method method;
             try {
                 method = findMethod(clazz, task.getMethodName(), args);
@@ -83,15 +108,22 @@ public class TaskExecutor {
                 return TaskResult.failure(task.getTaskId(), "Method not found: " + e.getMessage());
             }
 
+            if (progressCallback != null) {
+                progressCallback.onProgress(TaskProgress.running(task.getTaskId(), 70, "Executing method"));
+            }
+
             Object result;
             try {
                 method.setAccessible(true);
                 result = method.invoke(null, args);
-                log.debug("Method {} executed successfully, result type: {}, result value : {}", task.getMethodName(),
-                        result != null ? result.getClass().getName() : "null", result);
+                log.debug("Method {} executed successfully", task.getMethodName());
             } catch (Exception e) {
                 log.error("Error invoking method {}: {}", task.getMethodName(), e.getMessage(), e);
                 return TaskResult.failure(task.getTaskId(), "Error invoking method: " + e.getMessage());
+            }
+
+            if (progressCallback != null) {
+                progressCallback.onProgress(TaskProgress.running(task.getTaskId(), 90, "Serializing result"));
             }
 
             byte[] resultBytes;
@@ -112,13 +144,6 @@ public class TaskExecutor {
         } finally {
             activeTasks--;
         }
-    }
-
-    public void executeTaskAsync(Task task, TaskResultCallback callback) {
-        executorService.submit(() -> {
-            TaskResult result = executeTask(task);
-            callback.onComplete(result);
-        });
     }
 
     public void shutdown() {
@@ -169,6 +194,11 @@ public class TaskExecutor {
     @FunctionalInterface
     public interface TaskResultCallback {
         void onComplete(TaskResult result);
+    }
+
+    @FunctionalInterface
+    public interface ProgressCallback {
+        void onProgress(TaskProgress progress);
     }
 }
 

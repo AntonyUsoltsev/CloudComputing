@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import ru.nsu.common.JacksonConfig;
 import ru.nsu.model.Task;
+import ru.nsu.model.TaskProgress;
 import ru.nsu.model.TaskResult;
 
 import java.io.ByteArrayInputStream;
@@ -95,10 +96,39 @@ public class CloudClient {
             if (result != null) {
                 return result;
             }
+            
+            TaskProgress progress = getTaskProgress(taskId);
+            if (progress != null) {
+                log.info("Task {} progress: {}% - {} (Status: {})", 
+                        taskId, progress.getPercentage(), progress.getMessage(), progress.getStatus());
+            }
+            
             Thread.sleep(pollInterval);
         }
 
         throw new IOException("Task result timeout: task " + taskId + " did not complete in " + timeoutMs + "ms");
+    }
+
+    public TaskProgress getTaskProgress(UUID taskId) throws IOException, InterruptedException {
+        URI progressUrl = dispatcherUrl.resolve("/api/tasks/" + taskId + "?progress");
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(progressUrl)
+                .GET()
+                .timeout(Duration.ofSeconds(5))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() == 404) {
+            return null;
+        }
+
+        if (response.statusCode() != 200) {
+            throw new IOException("Failed to get task progress: HTTP " + response.statusCode());
+        }
+
+        return objectMapper.readValue(response.body(), TaskProgress.class);
     }
 
     public TaskResult getTaskResult(UUID taskId) throws IOException, InterruptedException {
